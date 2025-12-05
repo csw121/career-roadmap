@@ -37,7 +37,7 @@ def load_data():
     try:
         # 깃허브 용량 문제 해결을 위해 zip 파일을 읽습니다.
         # pandas는 zip 내부의 csv를 자동으로 찾아 읽어줍니다.
-        df = pd.read_csv('2025survey_results_public.zip')
+        df = pd.read_csv('2025survey_results_public.csv')
         return df
     except Exception as e:
         return None
@@ -316,3 +316,4 @@ with tab4:
 # ---------------------------------------------------------
 st.markdown("---")
 st.caption("© 2025 Developer Roadmap Service | Data Source: Stack Overflow Survey")
+
