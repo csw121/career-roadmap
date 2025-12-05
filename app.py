@@ -35,7 +35,7 @@ plt.rcParams['axes.unicode_minus'] = False
 def load_data():
     try:
         # CSV 파일 로드 (인코딩 문제시 encoding='cp949' 추가)
-        df = pd.read_csv('2025survey_results_public.csv')
+        df = pd.read_csv('2025survey_results_public.zip')
         return df
     except Exception as e:
         return None
@@ -263,4 +263,5 @@ with tab3:
 # 6. 마무리 조언
 # ---------------------------------------------------------
 st.divider()
+
 st.success(f"🎓 **{target_job} 취업 전략:** 파란색 그래프(현재)로 기본기를 다지고, 초록색 그래프(미래) 기술을 익혀 경쟁력을 확보하세요!")
