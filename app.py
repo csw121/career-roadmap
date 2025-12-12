@@ -37,51 +37,47 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 2. 한글 폰트 설정 (깨짐 방지 강화 버전)
+# 2. 한글 폰트 설정 (파일 강제 로드 버전)
 # ---------------------------------------------------------
 def set_korean_font():
-    """OS에 맞는 한글 폰트를 자동으로 찾아서 설정합니다."""
-    system_name = platform.system()
-    font_path = None
-
-    # 1. OS별 기본 폰트 경로 시도
-    if system_name == 'Windows':
-        font_path = "C:/Windows/Fonts/malgun.ttf"
-    elif system_name == 'Darwin': # Mac
-        font_path = "/System/Library/Fonts/AppleGothic.ttf"
-    else: # Linux (Streamlit Cloud, Ubuntu 등)
-        # 나눔폰트가 설치된 일반적인 경로들 탐색
-        possible_paths = [
-            "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-            "/usr/share/fonts/nanum/NanumGothic.ttf",
-            "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf"
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                font_path = p
-                break
-
-    # 2. 경로에 폰트가 없으면 시스템 폰트 리스트에서 탐색 (2차 시도)
-    if not font_path or not os.path.exists(font_path):
-        font_list = fm.findSystemFonts(fontpaths=None, fontext='ttf')
-        for f in font_list:
-            # 파일명이나 경로에 한글 폰트 관련 키워드가 있는지 확인
-            if 'Nanum' in f or 'Gothic' in f or 'Batang' in f:
-                font_path = f
-                break
-
-    # 3. 폰트 적용
-    if font_path and os.path.exists(font_path):
-        font_prop = fm.FontProperties(fname=font_path)
-        font_name = font_prop.get_name()
+    """같은 폴더에 있는 NanumGothic-Regular.ttf를 최우선으로 사용합니다."""
+    
+    # 1. 현재 파이썬 파일이 있는 경로에서 폰트 찾기
+    current_folder = os.getcwd() # 현재 작업 경로
+    font_file = "NanumGothic-Regular.ttf" # 사용자가 업로드한 정확한 파일명
+    font_path = os.path.join(current_folder, font_file)
+    
+    # 2. 폰트 파일 유무 확인 및 설정
+    if os.path.exists(font_path):
+        # 폰트가 발견되면 무조건 이걸로 설정
+        fm.fontManager.addfont(font_path)
+        font_name = fm.FontProperties(fname=font_path).get_name()
         plt.rcParams['font.family'] = font_name
-        plt.rcParams['axes.unicode_minus'] = False # 마이너스 기호 깨짐 방지
-        return True, font_name
+        plt.rcParams['axes.unicode_minus'] = False
+        return True, f"로컬 파일 사용 ({font_file})"
+    
+    # 3. 파일이 없으면 시스템 폰트 탐색 (비상용)
     else:
-        return False, None
+        system_name = platform.system()
+        sys_font_path = None
+        
+        if system_name == 'Windows':
+            sys_font_path = "C:/Windows/Fonts/malgun.ttf"
+        elif system_name == 'Darwin': 
+            sys_font_path = "/System/Library/Fonts/AppleGothic.ttf"
+        else: # Linux
+            sys_font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
+
+        if sys_font_path and os.path.exists(sys_font_path):
+            font_name = fm.FontProperties(fname=sys_font_path).get_name()
+            plt.rcParams['font.family'] = font_name
+            plt.rcParams['axes.unicode_minus'] = False
+            return True, "시스템 폰트 사용"
+            
+        return False, "폰트 파일 없음"
 
 # 폰트 설정 실행
-font_found, font_name_used = set_korean_font()
+font_found, font_msg = set_korean_font()
 
 # ---------------------------------------------------------
 # 3. 데이터 로드 (CSV)
@@ -89,7 +85,7 @@ font_found, font_name_used = set_korean_font()
 @st.cache_data
 def load_data():
     try:
-        # [주의] 로컬에 '2025survey_results_public.zip' 또는 '.csv' 파일이 있어야 합니다.
+        # [주의] 같은 폴더에 zip 파일이 있어야 합니다.
         df = pd.read_csv('2025survey_results_public.zip')
         return df
     except Exception as e:
@@ -102,14 +98,13 @@ df = load_data()
 # ---------------------------------------------------------
 with st.sidebar:
     st.header("📂 설정 및 선택")
-
-    # 폰트 디버깅 정보 (문제 발생 시 확인용)
+    
+    # 폰트 상태 표시 (디버깅용)
     if font_found:
-        st.caption(f"✅ 한글 폰트 적용됨: {font_name_used}")
+        st.success(f"✅ 한글 폰트 적용됨\n({font_msg})")
     else:
-        st.error("⚠️ 한글 폰트를 찾지 못했습니다.")
-        if platform.system() == 'Linux':
-            st.info("리눅스 환경입니다. 'fonts-nanum' 패키지를 설치해주세요.")
+        st.error("⚠️ 폰트 파일 미발견")
+        st.info("'NanumGothic-Regular.ttf' 파일을 app.py와 같은 폴더에 넣어주세요.")
 
     if df is None:
         st.warning("기본 데이터 파일을 찾을 수 없습니다.")
@@ -118,20 +113,19 @@ with st.sidebar:
             df = pd.read_csv(uploaded_file)
         else:
             st.info("데이터 파일이 없어도 [Tab 4: 맞춤 커리어 추천]은 사용 가능합니다.")
-
-    # 직무 선택 로직 (데이터가 있을 때만 활성화)
+            
+    # 직무 선택 로직
     target_job = "Developer, back-end" # 기본값
     job_df = None
-
+    
     if df is not None:
-        st.success("✅ 데이터 로드 성공!")
         st.divider()
         st.subheader("🎯 분석할 직무 선택")
 
         if 'DevType' in df.columns:
             all_jobs = df['DevType'].dropna().astype(str).str.split(';').explode().str.strip().unique()
             all_jobs = sorted([job for job in all_jobs if job.lower() != 'nan'])
-
+            
             default_index = all_jobs.index('Developer, back-end') if 'Developer, back-end' in all_jobs else 0
             target_job = st.selectbox("직무:", all_jobs, index=default_index)
 
@@ -147,7 +141,6 @@ with st.sidebar:
 # ---------------------------------------------------------
 st.title(f"🧭 2025 개발자 커리어 인사이트")
 
-# ★★★ 탭 4개 생성 (DevNavi 추가됨) ★★★
 tab1, tab2, tab3, tab4 = st.tabs(["📊 기술 트렌드", "🤖 AI 인식", "🧠 ML 심화 분석", "🧭 맞춤 커리어 추천"])
 
 # =========================================================
@@ -163,7 +156,7 @@ if job_df is not None:
             '☁️ 플랫폼': ('PlatformHaveWorkedWith', 'PlatformWantToWorkWith'),
             '🤖 AI 모델': ('AIModelsHaveWorkedWith', 'AIModelsWantToWorkWith')
         }
-
+        
         def get_top_skills(data, col, n=7):
             if col not in data.columns: return pd.Series(dtype='float64')
             return data[col].dropna().astype(str).str.split(';').explode().str.strip().value_counts().head(n)
@@ -220,7 +213,7 @@ if job_df is not None:
         # 1. 군집 분석
         st.subheader("📊 개발자 성향 군집화 (Cluster Analysis)")
         ml_data = job_df[['YearsCode', 'ConvertedCompYearly']].dropna().copy()
-
+        
         def clean_years(x):
             if x == 'Less than 1 year': return 0.5
             if x == 'More than 50 years': return 50
@@ -251,7 +244,7 @@ if job_df is not None:
         st.subheader("🔗 기술 연관 분석 (Association Analysis)")
         langs = job_df['LanguageHaveWorkedWith'].dropna().astype(str).str.split(';')
         all_langs = sorted(list(set([l for sublist in langs for l in sublist])))
-
+        
         selected_lang = st.selectbox("기준 언어를 선택하세요:", all_langs, index=0 if all_langs else 0)
 
         related_skills = {}
@@ -291,7 +284,7 @@ with tab4:
 
     # 입력 폼 생성 (Streamlit 위젯 사용)
     col1, col2 = st.columns(2)
-
+    
     with col1:
         st.subheader("Q1. 관심 분야")
         interest_options = {v['label']: k for k, v in RECOMMENDATION_DB['interests'].items()}
@@ -311,19 +304,19 @@ with tab4:
         "본인의 코딩 실력은?",
         options=["입문 (코드 처음 봄)", "초급 (문법은 뗌)", "중급 (프로젝트 경험 있음)"]
     )
-
+    
     level_map = {"입문 (코드 처음 봄)": "1", "초급 (문법은 뗌)": "2", "중급 (프로젝트 경험 있음)": "3"}
     user_level = level_map[level_choice]
 
     st.markdown("---")
-
+    
     # 분석 버튼
     if st.button("🚀 나만의 커리어 로드맵 분석하기", type="primary", use_container_width=True):
-
+        
         # 분석 시뮬레이션 효과
         with st.spinner('🔍 데이터를 분석하고 채용 트렌드와 매칭 중입니다...'):
             time.sleep(1.2)
-
+        
         # --- 추천 로직 (DevNavi 알고리즘) ---
         framework = ""
         ai_tools = ["GitHub Copilot"]
@@ -348,16 +341,16 @@ with tab4:
 
         # --- 결과 출력 ---
         st.success("🎉 분석이 완료되었습니다!")
-
+        
         st.markdown(f"### 📌 추천 트랙: **{user_interest['label']} 전문가 과정**")
         st.info(f"💡 {user_interest['desc']}")
 
         res_col1, res_col2 = st.columns(2)
-
+        
         with res_col1:
             st.markdown("#### [1] 1순위 추천 언어")
             st.code(f"{user_interest['base_lang']}")
-
+            
             st.markdown("#### [2] 필수 프레임워크")
             st.code(f"{framework}")
 
